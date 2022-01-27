@@ -115,11 +115,11 @@ class dodgeball_agents:
         decision_steps,terminal_steps = self.env.get_steps(self.get_teamName())
         decision_step = decision_steps.__getitem__(agentId)
         if agentId in decision_step:
-            self.reward = decision_step.agent_id
+            self.reward = decision_step.reward
         if agentId in terminal_steps:
             terminal_step = terminal_steps.__getitem__(agentId)
             self.done = True
-            self.reward = terminal_step.agent_id
+            self.reward = terminal_step.reward
         return self.reward, self.done        
 
             
