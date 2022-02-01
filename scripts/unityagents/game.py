@@ -28,7 +28,7 @@ def obs_list_to_state_vector(observation):
 if __name__ == '__main__':
     scenario = 'ctf'
     # scenario = 'simple_adversary'
-    env = dodgeball_agents("/home/brabeem/Documents/deepLearning/builds/RewardSingEnv/sectf.x86_64")
+    env = dodgeball_agents("../../RewardSingEnv/sectf.x86_64")
     env.set_env()
     n_agents = env.n
     actor_dims = []
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     MAX_STEPS = 5000
     total_steps = 0
     score_history = []
-    evaluate = True
+    evaluate = False
     # best_score = 0
 
     maddpg_agents.load_checkpoint()
@@ -89,7 +89,7 @@ if __name__ == '__main__':
         score_history.append(score)
         avg_score = np.mean(score_history[-100:])
         if not evaluate:
-            if i%5 == 0:
+            if i >= 0:
                 maddpg_agents.save_checkpoint()
                 print("\r average_score:{} in episode {}".format(avg_score,i),end=" ")
         """ if i % PRINT_INTERVAL == 0 and i > 0:
