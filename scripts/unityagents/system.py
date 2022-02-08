@@ -5,22 +5,21 @@ from mlagents_envs.side_channel.engine_configuration_channel import EngineConfig
 class dodgeball_agents:
     def __init__(self,file_name):
         channel = EngineConfigurationChannel()
-        channel.set_configuration_parameters(time_scale=4)
+        channel.set_configuration_parameters(time_scale=1)
         self.side_channels = [channel]
         self.file_name = file_name
         self.worker_id = 5
         self.seed = 4
-        # self.side_channels = []
         self.env=None
-        self.nbr_agent=3
+        self.nbr_agent=2
         self.n = self.nbr_agent * 2
         self.spec=None
-        self.agent_obs_size = 356 #512##without stacking##
+        self.agent_obs_size = 504
         self.num_envs = 1
-        self.num_time_stacks = 1 #as defined in the build
+        self.num_time_stacks = 1
         self.decision_steps = []
         self.terminal_steps = []
-        self.agent_ids=([0, 1, 2],[3, 4, 5])
+        self.agent_ids=([0, 1],[2, 3])
         
     ##return the environment from the file
     def set_env(self):
@@ -38,8 +37,7 @@ class dodgeball_agents:
         if self.num_envs > 1:
             self.agent_ids = ([0, 19, 32],[37, 51, 68]) #(purple, blue) 
         else:
-            self.agent_ids = ([0, 1, 2],[3, 4, 5])
-        #return self.env
+            self.agent_ids = ([0, 1],[2, 3])
     
     ##specify the behaviour name for the corresponding team,here in this game id is either 0 or 1
     def get_teamName(self,teamId=0):
@@ -94,7 +92,6 @@ class dodgeball_agents:
     def get_agent_decision_step(self,decision_steps, team_id, agent_index):
         assert team_id in [0, 1]
         assert agent_index in range(self.nbr_agent)
-        # assert type(decision_steps) == DecisionSteps
         return decision_steps[self.agent_ids[team_id][agent_index]]
         
     
@@ -102,22 +99,19 @@ class dodgeball_agents:
     def get_agent_obs_with_n_stacks(self, decision_step, num_time_stacks=1):
         #TODO: ainitialize with a big enough result instead of repetitive concatenation
         assert num_time_stacks >= 1
-        # assert type(decision_step) == DecisionStep
         obs = decision_step.obs
-        # print(obs[0].shape) ## (150,)
-        # print(obs[1].shape) ## (60,)
-        # print(obs[2].shape) ## (3,8)
+        # print(obs[0].shape) ## (246,)
+        # print(obs[1].shape) ## (84,)
+        # print(obs[2].shape) ## (2,8)
         # print(obs[3].shape) ## (12,)
         # print(obs[4].shape) ## (20,)
-        # print(obs[5].shape) ## (90,)
-
-        # result = obs[0].reshape((-1,))
+        # print(obs[5].shape) ## (126,)
         result = np.concatenate((obs[0],obs[1]))
-        result = np.concatenate((obs[2].reshape((-1,)),result))
-        for i in range(3, len(obs)):
+        result = np.concatenate((result,obs[2].reshape((-1,))))
+        for i in range(3, 6):
             result = np.concatenate((result, obs[i]))
-        #result = np.concatenate((result, obs[-1]))
-        return result ##(356,)
+        assert result.shape[0] == 504
+        return result
     
 
     ##returns agent observation from team decision_steps
@@ -137,19 +131,17 @@ class dodgeball_agents:
     def reward(self,team_id,agent_index):
         if self.agent_ids[team_id][agent_index] in self.decision_steps[team_id].agent_id:
             reward = self.decision_steps[team_id].__getitem__(self.agent_ids[team_id][agent_index]).reward
-            #done = False
+            grp_reward = self.decision_steps[team_id].__getitem__(self.agent_ids[team_id][agent_index]).group_reward
         if self.agent_ids[team_id][agent_index] in self.terminal_steps[team_id].agent_id:
             reward = self.terminal_steps[team_id].__getitem__(self.agent_ids[team_id][agent_index]).reward
-            #done = True
-        return reward  
+            grp_reward = self.terminal_steps[team_id].__getitem__(self.agent_ids[team_id][agent_index]).group_reward
+        return reward + grp_reward
     
     ##returns done##
     def terminal(self,team_id,agent_index):
         if self.agent_ids[team_id][agent_index] in self.decision_steps[team_id].agent_id:
-        #    reward = self.decision_steps.__getitem__(self.agent_ids[team_id][agent_index]).reward
             done = False
         if self.agent_ids[team_id][agent_index] in self.terminal_steps[team_id].agent_id:
-        #    reward = self.terminal_steps.__getitem__(self.agent_ids[team_id][agent_index]).reward
             done = True
         return done 
    
@@ -157,7 +149,7 @@ class dodgeball_agents:
     def get_all_agent_obs(self):
         obs = []
         for teamid in range(2):
-            for agentIndex in range(3):
+            for agentIndex in range(2):
                 obs.append(self.get_agent_obs_from_decision_steps(self.decision_steps[teamid],teamid,agentIndex,1))
         return obs
 
@@ -176,7 +168,7 @@ class dodgeball_agents:
     def get_all_agent_reward(self):
         rewards = []
         for teamId in range(2):
-            for agentInd in range(3):
+            for agentInd in range(2):
                 rewards.append(self.reward(teamId,agentInd))
         return rewards
     
@@ -185,7 +177,7 @@ class dodgeball_agents:
     def get_all_agent_done(self):
         dones = []
         for teamId in range(2):
-            for agentInd in range(3):
+            for agentInd in range(2):
                 dones.append(self.terminal(teamId,agentInd))
         return dones
     
@@ -193,12 +185,9 @@ class dodgeball_agents:
     def numpy_list_to_action_tuple_list(self, numpy_list):
         num_continuous = 3
         action_tuple_list = []
-        #for continuous actions, i.e. 1.0 from network  = 10 in env
         for element in numpy_list:
-            action_tuple_continuous = element[:num_continuous]
-            # print(element[num_continuous:])
-            # action_tuple_discrete = np.random.binomial(1, p=element[num_continuous:])
-            action_tuple_discrete = element[num_continuous:]##recently added##
+            action_tuple_continuous =  element[:num_continuous]
+            action_tuple_discrete = element[num_continuous:]
             action_tuple_list.append(ActionTuple(np.expand_dims(action_tuple_continuous,0),np.expand_dims(action_tuple_discrete,0)))
         return action_tuple_list
 
@@ -207,12 +196,11 @@ class dodgeball_agents:
     # discrete actions##
     def step(self,actions):
         action_idx = 0
-        ##braing the list of action tuples from the list of numpy arrays##
+        ##bring the list of action tuples from the list of numpy arrays##
         actions = self.numpy_list_to_action_tuple_list(actions)
-        #print(actions)
         ##set action for all agents##
         for teamId in range(2):
-            for agentInd in range(3):
+            for agentInd in range(2):
                 self.set_action_for_agent_(teamId,agentInd,actions[action_idx])
                 action_idx += 1
         
@@ -225,9 +213,9 @@ class dodgeball_agents:
         
         ##recently added to resolve err##
         dones = self.get_all_agent_done()
-        if any(dones[0:3]):
+        if any(dones[0:2]):
             self.decision_steps[0] = self.terminal_steps[0]
-        if any(dones[3:6]):
+        if any(dones[2:4]):
             self.decision_steps[1] = self.terminal_steps[1]
 
         ##get next_states ,rewards and dones from updated decision and terminal steps##
@@ -243,11 +231,9 @@ class dodgeball_agents:
         actions = []
         for i in range(6):
             a = np.random.random(5)
-            a = np.expand_dims(a,axis=0)##remember neural network output is expected to be in this format##
+            a = np.expand_dims(a,axis=0)
             ##format(1,5)
             actions.append(a)
-
-        #print(actions)
         return actions
 
     
