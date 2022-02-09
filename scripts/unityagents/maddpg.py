@@ -66,26 +66,37 @@ class MADDPG:
             all_agents_new_mu_actions.append(pi)
             old_agents_actions.append(actions[agent_idx])
 
-        new_actions = T.cat([acts for acts in all_agents_new_actions], dim=1)
-        mu = T.cat([acts for acts in all_agents_new_mu_actions], dim=1)
-        old_actions = T.cat([acts for acts in old_agents_actions],dim=1)
+        new_actions = T.cat([acts for acts in all_agents_new_actions], dim=1) #from target_actor(new state)
+        mu = T.cat([acts for acts in all_agents_new_mu_actions], dim=1) #from actor(state)
+        old_actions = T.cat([acts for acts in old_agents_actions],dim=1) #from observed action (added with noise)
 
         for agent_idx, agent in enumerate(self.agents):
             agent.actor.optimizer.zero_grad()
         
+        
+        Agent.critic[0].optimizer.zero_grad()
+        critic_value_ = Agent.critic[1].forward(states_, new_actions)
+        # print(Agent.critic[0].forward(states, old_actions))
+        # print(Agent.critic[0].forward(states, old_actions).flatten())
+        
+        critic_value_[dones] = 0.0
+        ####critic_value_ = critic_value_.flatten()
+        critic_value = Agent.critic[0].forward(states, old_actions)
+        #print(rewards)
+        target = rewards + 0.99*critic_value_
+        #print(target, critic_value)
+        critic_loss = F.mse_loss(target, critic_value)
+        print(critic_loss)
+        critic_loss.backward(retain_graph=True)
+        Agent.critic[0].optimizer.step()
+        actors_loss = Agent.critic[0].forward(states, mu)
+        actors_loss = T.mean(actors_loss, axis=0)
+        print(actors_loss)
+        #print("here")
+        #print(actors_loss.shape)
+        # print(actors_loss.flatten.shape())
         for agent_idx, agent in enumerate(self.agents):
-            critic_value_ = agent.target_critic.forward(states_, new_actions).flatten()
-            critic_value_[dones[:,0]] = 0.0
-            critic_value = agent.critic.forward(states, old_actions).flatten()
-
-            target = rewards[:,agent_idx] + agent.gamma*critic_value_
-            critic_loss = F.mse_loss(target, critic_value)
-            agent.critic.optimizer.zero_grad()
-            critic_loss.backward(retain_graph=True)
-            agent.critic.optimizer.step()
-
-            actor_loss = agent.critic.forward(states, mu).flatten()
-            actor_loss = -T.mean(actor_loss)
+            actor_loss = -actors_loss[agent_idx]
             actor_loss.backward(retain_graph=True)
             
         for agent_idx, agent in enumerate(self.agents):

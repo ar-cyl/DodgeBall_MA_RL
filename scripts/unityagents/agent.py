@@ -2,39 +2,40 @@ import torch as T
 from network import ActorNetwork, CriticNetwork
 
 class Agent:
+    critic = [CriticNetwork(0.01, 2016, 
+                            0, 0, n_agents=4, n_actions=5, 
+                            chkpt_dir='tmp/maddpg/', name='central_critic'),
+                CriticNetwork(0.01, 2016, 
+                                            0, 0, n_agents=4, n_actions=5,
+                                            chkpt_dir='tmp/maddpg/',
+                                            name='central_target_critic')] #[local, target]
+
+
+    
     def __init__(self, actor_dims, critic_dims, n_actions, n_agents, agent_idx, chkpt_dir,
                     alpha=0.01, beta=0.01, fc1=128, 
-                    fc2=64, gamma=0.95, tau=0.01):
+                    fc2=64, gamma=0.95, tau=0.1):
         self.gamma = gamma
         self.tau = tau
         self.n_actions = n_actions
         self.agent_name = 'agent_%s' % agent_idx
         self.actor = ActorNetwork(alpha, actor_dims, fc1, fc2, n_actions, 
                                   chkpt_dir=chkpt_dir,  name=self.agent_name+'_actor')
-        self.critic = CriticNetwork(beta, critic_dims, 
-                            fc1, fc2, n_agents, n_actions, 
-                            chkpt_dir=chkpt_dir, name=self.agent_name+'_critic')
         self.target_actor = ActorNetwork(alpha, actor_dims, fc1, fc2, n_actions,
                                         chkpt_dir=chkpt_dir, 
                                         name=self.agent_name+'_target_actor')
-        self.target_critic = CriticNetwork(beta, critic_dims, 
-                                            fc1, fc2, n_agents, n_actions,
-                                            chkpt_dir=chkpt_dir,
-                                            name=self.agent_name+'_target_critic')
+      
 
         self.update_network_parameters(tau=1)
 
     def choose_action(self, observation):
         state = T.tensor([observation], dtype=T.float).to(self.actor.device)
         actions = self.actor.forward(state)
-        actions = T.squeeze(actions)
         noise = T.rand(self.n_actions).to(self.actor.device)
-        actions = actions + noise
-        dis_action = actions[3:]
-        dis_action = T.clamp(dis_action,0,1)
-        dis_action = T.bernoulli(dis_action)
-        actions[3:] = dis_action
-        return actions.detach().cpu().numpy()
+        noise[3:5] = 0 #WARNING: hardcoded
+        action = actions + noise/5
+
+        return actions.detach().cpu().numpy()[0] 
 
     def update_network_parameters(self, tau=None):
         if tau is None:
@@ -51,8 +52,8 @@ class Agent:
 
         self.target_actor.load_state_dict(actor_state_dict)
 
-        target_critic_params = self.target_critic.named_parameters()
-        critic_params = self.critic.named_parameters()
+        target_critic_params = self.critic[1].named_parameters()
+        critic_params = self.critic[0].named_parameters()
 
         target_critic_state_dict = dict(target_critic_params)
         critic_state_dict = dict(critic_params)
@@ -60,16 +61,17 @@ class Agent:
             critic_state_dict[name] = tau*critic_state_dict[name].clone() + \
                     (1-tau)*target_critic_state_dict[name].clone()
 
-        self.target_critic.load_state_dict(critic_state_dict)
+        self.critic[1].load_state_dict(critic_state_dict)
 
+       
     def save_models(self):
         self.actor.save_checkpoint()
         self.target_actor.save_checkpoint()
-        self.critic.save_checkpoint()
-        self.target_critic.save_checkpoint()
+        self.critic[0].save_checkpoint()
+        self.critic[1].save_checkpoint()
 
     def load_models(self):
         self.actor.load_checkpoint()
         self.target_actor.load_checkpoint()
-        self.critic.load_checkpoint()
-        self.target_critic.load_checkpoint()
+        self.critic[0].load_checkpoint()
+        self.critic[1].load_checkpoint()
