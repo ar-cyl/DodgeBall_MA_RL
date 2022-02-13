@@ -1,7 +1,13 @@
 import torch as T
 import torch.nn.functional as F
 from agent import Agent
+import csv
 
+grads_f = open("grads_actor.txt", 'a')
+writerr = csv.writer(grads_f)
+
+grads_ff = open("grads_critic.txt", 'a')
+writerrr = csv.writer(grads_ff)
 class MADDPG:
     def __init__(self, actor_dims, critic_dims, n_agents, n_actions, 
                  scenario='ctf',  alpha=0.01, beta=0.01, fc1=128, 
@@ -86,19 +92,23 @@ class MADDPG:
         target = rewards + 0.99*critic_value_
         #print(target, critic_value)
         critic_loss = F.mse_loss(target, critic_value)
-        print(critic_loss)
+        #T.save(critic_loss, 'critic_loss.pt')
         critic_loss.backward(retain_graph=True)
+        writerrr.writerow(Agent.critic[0].fc4.weight.grad)
         Agent.critic[0].optimizer.step()
         actors_loss = Agent.critic[0].forward(states, mu)
         actors_loss = T.mean(actors_loss, axis=0)
-        print(actors_loss)
+        #T.save(actors_loss, 'actors_loss.pt')
         #print("here")
         #print(actors_loss.shape)
         # print(actors_loss.flatten.shape())
         for agent_idx, agent in enumerate(self.agents):
             actor_loss = -actors_loss[agent_idx]
             actor_loss.backward(retain_graph=True)
-            
+
         for agent_idx, agent in enumerate(self.agents):
+            writerr.writerow(agent.actor.pi1.weight.grad)
+            print(agent.actor.f1.weight.data)
             agent.actor.optimizer.step()
             agent.update_network_parameters()
+        

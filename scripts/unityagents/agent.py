@@ -1,5 +1,8 @@
 import torch as T
 from network import ActorNetwork, CriticNetwork
+import csv
+
+
 
 class Agent:
     critic = [CriticNetwork(0.01, 2016, 
@@ -10,11 +13,10 @@ class Agent:
                                             chkpt_dir='tmp/maddpg/',
                                             name='central_target_critic')] #[local, target]
 
-
     
     def __init__(self, actor_dims, critic_dims, n_actions, n_agents, agent_idx, chkpt_dir,
                     alpha=0.01, beta=0.01, fc1=128, 
-                    fc2=64, gamma=0.95, tau=0.1):
+                    fc2=64, gamma=0.95, tau=0.01):
         self.gamma = gamma
         self.tau = tau
         self.n_actions = n_actions
@@ -31,9 +33,9 @@ class Agent:
     def choose_action(self, observation):
         state = T.tensor([observation], dtype=T.float).to(self.actor.device)
         actions = self.actor.forward(state)
-        noise = T.rand(self.n_actions).to(self.actor.device)
+        noise = T.randn(self.n_actions).to(self.actor.device)
         noise[3:5] = 0 #WARNING: hardcoded
-        action = actions + noise/5
+        action = actions + noise
 
         return actions.detach().cpu().numpy()[0] 
 
@@ -63,7 +65,9 @@ class Agent:
 
         self.critic[1].load_state_dict(critic_state_dict)
 
-       
+
+
+
     def save_models(self):
         self.actor.save_checkpoint()
         self.target_actor.save_checkpoint()
