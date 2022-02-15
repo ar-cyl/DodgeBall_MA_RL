@@ -15,7 +15,8 @@ if __name__ == '__main__':
     # get the params
     args = get_args()
     time_scale = 1 if args.evaluate == True else 40
-    env, args = make_env(args,"/home/arcyl/new/small map return safe flag/small_map_return_safe_flags.x86_64", time_scale)
+    no_graphics = False if args.evaluate == True else True
+    env, args = make_env(args,"/home/arcyl/new/small map return safe flag/small_map_return_safe_flags.x86_64", time_scale, no_graphics)
     runner = Runner(args, env)
     train=args.evaluate==False
     if not train:

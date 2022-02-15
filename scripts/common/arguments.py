@@ -19,7 +19,7 @@ def get_args():
     parser.add_argument("--noise_rate", type=float, default=1, help="noise rate for sampling from a standard normal distribution ")
     parser.add_argument("--gamma", type=float, default=0.99, help="discount factor")
     parser.add_argument("--tau", type=float, default=0.01, help="parameter for updating the target network")
-    parser.add_argument("--buffer-size", type=int, default=int(1e5), help="number of transitions can be stored in buffer")
+    parser.add_argument("--buffer-size", type=int, default=int(5e4), help="number of transitions can be stored in buffer")
     parser.add_argument("--batch-size", type=int, default=1000, help="number of episodes to optimize at the same time")
     parser.add_argument("--learn_rate", type=int, default=100, help="number of episodes to optimize at the same time")
     # Checkpointing

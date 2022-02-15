@@ -3,7 +3,7 @@ from mlagents_envs.base_env import DecisionSteps, TerminalSteps, ActionTuple,  A
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 import numpy as np
 class dodgeball_agents:
-    def __init__(self,file_name, time_scale):
+    def __init__(self,file_name, time_scale, no_graphics):
         # Create the side channel
         self.engine_config_channel = EngineConfigurationChannel()
         self.engine_config_channel.set_configuration_parameters(time_scale=time_scale)
@@ -17,6 +17,7 @@ class dodgeball_agents:
         #self.agent_obs_size = 512 #356##without stacking##
         self.agent_obs_size = 504
         self.num_envs = 1
+        self.no_graphics = no_graphics
         #self.num_time_stacks = 3 #as defined in the build
         self.num_time_stacks = 1
         self.decision_steps = {0:DecisionSteps, 1:DecisionSteps}
@@ -26,7 +27,7 @@ class dodgeball_agents:
         
     ##return the environment from the file
     def set_env(self):
-        self.env=UnityEnvironment(file_name=self.file_name,worker_id=self.worker_id, seed=self.worker_id, side_channels=self.side_channels)
+        self.env=UnityEnvironment(file_name=self.file_name,worker_id=self.worker_id, seed=self.worker_id, side_channels=self.side_channels, no_graphics = self.no_graphics)
         self.env.reset()
         self.spec=self.team_spec() 
         self.decision_steps[0],self.terminal_steps[0] = self.env.get_steps(self.get_teamName(teamId = 0))
