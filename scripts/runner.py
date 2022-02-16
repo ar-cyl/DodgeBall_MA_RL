@@ -10,7 +10,7 @@ from collections import deque
 import csv
 import numpy as np
 from random import sample
-from maddpg.actor_critic import Actor
+
 f_blue = open("blue_returns.txt", 'a')
 f_purple = open("purple_returns.txt", 'a')
 writer_blue = csv.writer(f_blue)
@@ -25,12 +25,14 @@ class Runner:
         self.buffer = Buffer(args)
         self.avg_returns_test={'team_purple':[],'team_blue':[], 'sum_reward':[]}
         self.avg_returns_train={'team_purple':[],'team_blue':[], 'sum_reward':[]}
+        self.elo_ratings = [1200, 1200]
         self.count_ep=0
         self.scores_deque = {'team_purple':deque(maxlen=5),'team_blue':deque(maxlen=5)}
         self.save_path = self.args.save_dir + '/' + self.args.scenario_name
         self.network_bank = deque(maxlen=self.args.size_netbank)
         self.opponent_networks = None
         self.agents = [[], []]
+        self.last_opponent_index = -1
         self._init_agents()
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
@@ -43,16 +45,24 @@ class Runner:
 
     def swap_opponent_team(self):
         select_latest = np.random.binomial(1, p=self.args.p_select_latest)
-        if select_latest:
-            self.opponent_networks = self.network_bank[-1]
+        if select_latest or len(self.network_bank) == 1:
+            self.opponent_networks = self.network_bank[self.last_opponent_index]
+        elif len(self.network_bank) == 0:
+            return
         else:
-            idx = np.random.randint(0, len(self.network_bank)-1)
-            self.opponent_networks = self.network_bank[idx]
+            self.last_opponent_index = np.random.randint(0, len(self.network_bank)-1)
+            self.opponent_networks = self.network_bank[self.last_opponent_index]
         
-        #TODO load state dict to opponent team
         for agent_id in range(self.args.n_learning_agents):
             self.agents[1][agent_id].load_actor_params(self.opponent_networks[agent_id])
 
+    def update_elo_rating(self, results):
+        expected = [None, None]
+        rdiff_0 = self.elo_ratings[1] - self.elo_ratings[0]
+        rdiff = [rdiff_0, -rdiff_0]
+        for index in range(len(self.elo_ratings)):
+            expected[index] = 1/(1 + 10**(rdiff[index]/400))
+            self.elo_ratings[index] += 20*(results[index] - expected[index])
 
     def run(self):
         returns = {'team_purple':[],'team_blue':[]}
@@ -63,7 +73,7 @@ class Runner:
             print("Episode: ", i, " Steps: ", time_step)
             s,r,gr,d = self.env.reset()
             # for agent in self.agents:
-            #     agent.noise.reset()
+            #     #TODO load state dict to opponent teamagent.noise.reset()
             rewards = {'team_purple':0,'team_blue':0}
             while True:
                 time_step += 1
@@ -91,18 +101,23 @@ class Runner:
                 
                 
                 if time_step % self.args.save_team==0:
+                    print("Saving network to network bank")
                     self.network_bank.append([self.agents[0][idx].get_actor_params() for idx in range(self.args.n_learning_agents)])
                 
                 if time_step % self.args.swap_team==0:
+                    print("Swapping opponent team")
                     self.swap_opponent_team()
                 # if time_step > 0 and time_step % self.args.evaluate_rate == 0:
                 #     self.evaluate()
                 #     self.plot_graph( self.avg_returns_test['team_blue'],list( self.avg_returns_test.keys())[0],method='test')
                 #     self.plot_graph( self.avg_returns_test['team_purple'],list( self.avg_returns_test.keys())[1],method='test')
-                if(any(done)==True):
+                if any(done):
+                    #TODO: result = 1 if win, 0 if lose, 0.5 if draw
+                    # result = None
+                    # self.update_elo_rating(result)
                     break
             
-            self.noise = max(0.01, self.noise - 0.001)
+            self.noise = max(0.05,   self.noise - 0.0007)
             self.epsilon = max(0.01, self.epsilon - 0.0002)
             #returns['team_blue'].append(rewards['team_blue'])
             #returns['team_purple'].append(rewards['team_purple'])
@@ -186,7 +201,7 @@ class Runner:
                 with torch.no_grad():
                     for team_id in range(2):
                         for agent_id, agent in enumerate(self.agents[team_id]):
-                            a.append(agent.select_action(s[agent_id], self.noise, self.epsilon))
+                            a.append(agent.select_action(s[agent_id], 0, 0))
 
                 s_next, r,gr, done= self.env.step(a)
              
