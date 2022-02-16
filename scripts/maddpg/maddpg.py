@@ -88,8 +88,8 @@ class MADDPG:
         # the q loss
         q_value = self.critic_network.forward(o, a)
         critic_loss =self.huber_loss(q_value,target_q)
-        # if self.agent_id==0:
-        #     print("critic loss for agent {} is {}".format(self.agent_id,critic_loss ))
+        if self.agent_id==0:
+            print("critic loss for agent {} is {}".format(self.agent_id,critic_loss ))
         # the actor loss
         a[self.agent_id]=self.actor_network.forward(o[self.agent_id])
         actor_loss = - self.critic_network(o, a).mean()
