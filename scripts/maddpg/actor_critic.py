@@ -64,7 +64,7 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     """Critic (Value) Model."""
 
-    def __init__(self,args,fcs1_units=512, fc2_units=512):
+    def __init__(self,args,fcs1_units=1024, fc2_units=1024, fc3_units=512):
         """Initialize parameters and build model.
         Params
         ======
@@ -81,7 +81,9 @@ class Critic(nn.Module):
         self.bn2 = nn.BatchNorm1d(fcs1_units)
         self.fc2 = nn.Linear(fcs1_units + sum(args.action_shape), fc2_units)
         self.bn3 = nn.BatchNorm1d(fc2_units)
-        self.fc3 = nn.Linear(fc2_units, 1)
+        self.fc3 = nn.Linear(fc2_units, fc3_units)
+        self.bn4 = nn.BatchNorm1d(fc3_units)
+        self.fc4 = nn.Linear(fc3_units, 1)
         self.reset_parameters()
         self.to(args.device)
 
@@ -89,10 +91,12 @@ class Critic(nn.Module):
         self.fcs1.weight.data.uniform_(*hidden_init(self.fcs1))
         self.fc2.weight.data.uniform_(*hidden_init(self.fc2))
         self.fc3.weight.data.uniform_(-3e-3, 3e-3)
+        self.fc4.weight.data.uniform_(-3e-3, 3e-3)
 
     def forward(self, state, action):
         """Build a critic (value) network that maps (state, action) pairs -> Q-values."""
         state = torch.cat(state, dim=1)
+        state = self.bn1(state)
         xs = F.relu(self.fcs1(state))
         xs = self.bn2(xs)
         action = torch.cat(action, dim=1)
@@ -100,8 +104,11 @@ class Critic(nn.Module):
             action[i] /= self.max_action
         x = torch.cat([xs, action], dim=1)
         x = F.relu(self.fc2(x))
+        x = self.bn3(x)
+        x = F.relu(self.fc3(x))
+        x = self.bn4(x)
 
-        return self.fc3(x)
+        return self.fc4(x)
 # # define the actor network
 # class Actor(nn.Module):
 #     def __init__(self, args, agent_id):

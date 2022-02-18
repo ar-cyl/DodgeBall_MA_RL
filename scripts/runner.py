@@ -13,8 +13,10 @@ from random import sample
 
 f_blue = open("blue_returns.txt", 'a')
 f_purple = open("purple_returns.txt", 'a')
+f_elo = open("elo_rating", 'a')
 writer_blue = csv.writer(f_blue)
 writer_purple = csv.writer(f_purple)
+writer_elo = csv.writer(f_elo)
 class Runner:
     def __init__(self, args, env):
         self.args = args
@@ -55,6 +57,7 @@ class Runner:
         
         for agent_id in range(self.args.n_learning_agents):
             self.agents[1][agent_id].load_actor_params(self.opponent_networks[agent_id])
+        self.elo_ratings[1] = 1200
 
     def update_elo_rating(self, results):
         expected = [None, None]
@@ -62,10 +65,9 @@ class Runner:
         rdiff = [rdiff_0, -rdiff_0]
         for index in range(len(self.elo_ratings)):
             expected[index] = 1/(1 + 10**(rdiff[index]/400))
-            self.elo_ratings[index] += 20*(results[index] - expected[index])
+            self.elo_ratings[index] += 5*(results[index] - expected[index])
 
     def run(self):
-        returns = {'team_purple':[],'team_blue':[]}
         n=self.args.n_agents
         time_step=0
         for i in range(self.episode_limit+1):
@@ -113,8 +115,13 @@ class Runner:
                 #     self.plot_graph( self.avg_returns_test['team_purple'],list( self.avg_returns_test.keys())[1],method='test')
                 if any(done):
                     #TODO: result = 1 if win, 0 if lose, 0.5 if draw
-                    # result = None
-                    # self.update_elo_rating(result)
+                    if r[0] >= 10:
+                        result = [1,0]
+                    elif r[3] >= 10:
+                        result = [0,1]
+                    else:  
+                        result = [0.5,0.5] 
+                    self.update_elo_rating(result)
                     break
             
             self.noise = max(0.05,   self.noise - 0.0007)
@@ -131,8 +138,14 @@ class Runner:
             self.avg_returns_train['team_purple'].append(purple_avg_reward)
             writer_blue.writerow(self.avg_returns_train['team_blue'])
             writer_purple.writerow(self.avg_returns_train['team_purple'])
+            writer_elo.writerow(self.elo_ratings)
             # self.avg_returns_train['sum_reward'].append(blue_avg_reward+purple_avg_reward)
+            # 
             # self.plot_graph(self.avg_returns_train,method='train')
+            if i % 5 == 0:
+                f_blue.flush()
+                f_purple.flush()
+                f_elo.flush()
             # if(np.mean(self.scores_deque['team_purple'])>3 and i >100):
             #     break
         return self.avg_returns_train
@@ -141,10 +154,10 @@ class Runner:
         plt.figure()
         plt.plot(range(len(avg_returns['team_blue'])),avg_returns['team_blue'])
         plt.plot(range(len(avg_returns['team_purple'])),avg_returns['team_purple'])
-        plt.plot(range(len(avg_returns['sum_reward'])),avg_returns['sum_reward'])
+        # plt.plot(range(len(avg_returns['sum_reward'])),avg_returns['sum_reward'])
         plt.xlabel('episode')
         plt.ylabel('average returns')
-        plt.legend(["blue_reward","purple_reward","sum_reward"])
+        plt.legend(["blue_reward","purple_reward"])
         if method=='test':
             plt.savefig(self.save_path + '/' + 'test_plt.png' , format='png')
         else:
